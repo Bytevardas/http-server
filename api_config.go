@@ -9,6 +9,7 @@ import (
 
 type apiConfig struct {
 	fileserverHits atomic.Int32
+	env            string
 	db             *database.Queries
 }
 

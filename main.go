@@ -17,19 +17,21 @@ func main() {
 	godotenv.Load()
 
 	dbURL := os.Getenv("DB_URL")
+	env := os.Getenv("PLATFORM")
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
 		log.Fatalf("could not connect to database: %v", err)
 	}
 
 	dbQueries := database.New(db)
-	config := apiConfig{db: dbQueries}
+	config := apiConfig{db: dbQueries, env: env}
 	mux := http.NewServeMux()
 	mux.Handle("/app/", config.middlewareMetricsInc(http.StripPrefix("/app/", http.FileServer(http.Dir("./app/")))))
 	mux.HandleFunc("GET /admin/healthz", handlerHealthCheck)
-	mux.HandleFunc("GET /admin/metrics", config.handerMetrics)
-	mux.HandleFunc("POST /admin/reset", config.handerReset)
+	mux.HandleFunc("GET /admin/metrics", config.handlerMetrics)
+	mux.HandleFunc("POST /admin/reset", config.handlerReset)
 	mux.HandleFunc("POST /api/validate_chirp", handlerValidateChirp)
+	mux.HandleFunc("POST /api/users", config.handlerCreateUser)
 
 	server := http.Server{Addr: ":8080", Handler: mux}
 	err = server.ListenAndServe()
