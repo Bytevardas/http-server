@@ -14,10 +14,12 @@ func (cfg *apiConfig) handlerMetrics(w http.ResponseWriter, req *http.Request) {
 func (cfg *apiConfig) handlerReset(w http.ResponseWriter, req *http.Request) {
 	if cfg.env != "dev" {
 		respondWithError(w, 403, "can't reset the database on non dev environment")
+		return
 	}
 
 	if err := cfg.db.DeleteAllUsers(req.Context()); err != nil {
 		respondWithError(w, 500, "failed to delete users")
+		return
 	}
 
 	respondWithJSON(w, 200, "success")

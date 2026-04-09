@@ -6,13 +6,37 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"time"
+
+	"http-server/internal/database"
+
+	"github.com/google/uuid"
 )
 
 var badWords = []string{"kerfuffle", "sharbert", "fornax"}
 
-func handlerValidateChirp(w http.ResponseWriter, req *http.Request) {
+type chirpResponse struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	UserID    uuid.UUID `json:"user_id"`
+	Body      string    `json:"body"`
+}
+
+func dbChirpToResponse(chirp database.Chirp) chirpResponse {
+	return chirpResponse{
+		ID:        chirp.ID,
+		CreatedAt: chirp.CreatedAt,
+		UpdatedAt: chirp.UpdatedAt,
+		UserID:    chirp.UserID,
+		Body:      chirp.Body,
+	}
+}
+
+func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, req *http.Request) {
 	type requestBody struct {
-		Body string `json:"body"`
+		Body   string    `json:"body"`
+		UserId uuid.UUID `json:"user_id"`
 	}
 
 	defer req.Body.Close()
@@ -34,12 +58,31 @@ func handlerValidateChirp(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	filteredSentence := filterBadWords(params.Body)
-	type responseBody struct {
-		Valid       bool   `json:"valid"`
-		CleanedBody string `json:"cleaned_body,omitempty"`
+	chirp, err := cfg.db.CreateChirp(req.Context(), database.CreateChirpParams{
+		UserID: params.UserId,
+		Body:   filterBadWords(params.Body),
+	})
+	if err != nil {
+		respondWithError(w, 500, "unable to create chirp")
+		return
 	}
-	respondWithJSON(w, 200, responseBody{Valid: true, CleanedBody: filteredSentence})
+
+	respondWithJSON(w, 201, dbChirpToResponse(chirp))
+}
+
+func (cfg *apiConfig) handlerGetAllChirps(w http.ResponseWriter, r *http.Request) {
+	chirps, err := cfg.db.GetAllChirps(r.Context())
+	if err != nil {
+		respondWithError(w, 500, "failed to fetch chirps")
+		return
+	}
+
+	response := make([]chirpResponse, 0, len(chirps))
+	for _, chirp := range chirps {
+		response = append(response, dbChirpToResponse(chirp))
+	}
+
+	respondWithJSON(w, 200, response)
 }
 
 func filterBadWords(sentence string) string {
