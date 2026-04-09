@@ -17,6 +17,7 @@ func main() {
 	godotenv.Load()
 
 	dbURL := os.Getenv("DB_URL")
+	secret := os.Getenv("JWT_SECRET")
 	env := os.Getenv("PLATFORM")
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
@@ -24,7 +25,7 @@ func main() {
 	}
 
 	dbQueries := database.New(db)
-	config := apiConfig{db: dbQueries, env: env}
+	config := apiConfig{db: dbQueries, env: env, secret: secret}
 	mux := http.NewServeMux()
 	mux.Handle("/app/", config.middlewareMetricsInc(http.StripPrefix("/app/", http.FileServer(http.Dir("./app/")))))
 	mux.HandleFunc("GET /admin/healthz", handlerHealthCheck)
@@ -34,6 +35,7 @@ func main() {
 	mux.HandleFunc("GET /api/chirps", config.handlerGetAllChirps)
 	mux.HandleFunc("GET /api/chirps/{chirpId}", config.handlerGetChirp)
 	mux.HandleFunc("POST /api/users", config.handlerCreateUser)
+	mux.HandleFunc("POST /api/login", config.handlerLogin)
 
 	server := http.Server{Addr: ":8080", Handler: mux}
 	err = server.ListenAndServe()
