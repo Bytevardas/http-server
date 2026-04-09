@@ -30,7 +30,8 @@ func main() {
 	mux.HandleFunc("GET /admin/healthz", handlerHealthCheck)
 	mux.HandleFunc("GET /admin/metrics", config.handlerMetrics)
 	mux.HandleFunc("POST /admin/reset", config.handlerReset)
-	mux.HandleFunc("POST /api/validate_chirp", handlerValidateChirp)
+	mux.HandleFunc("POST /api/chirps", config.handlerCreateChirp)
+	mux.HandleFunc("GET /api/chirps", config.handlerGetAllChirps)
 	mux.HandleFunc("POST /api/users", config.handlerCreateUser)
 
 	server := http.Server{Addr: ":8080", Handler: mux}
