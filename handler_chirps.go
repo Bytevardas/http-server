@@ -85,6 +85,23 @@ func (cfg *apiConfig) handlerGetAllChirps(w http.ResponseWriter, r *http.Request
 	respondWithJSON(w, 200, response)
 }
 
+func (cfg *apiConfig) handlerGetChirp(w http.ResponseWriter, r *http.Request) {
+	value := r.PathValue("chirpId")
+	chirpId, err := uuid.Parse(value)
+	if err != nil {
+		respondWithError(w, 400, "value is not uuid")
+		return
+	}
+
+	chirp, err := cfg.db.GetChirp(r.Context(), chirpId)
+	if err != nil {
+		respondWithError(w, 404, "chirp not found")
+		return
+	}
+
+	respondWithJSON(w, 200, dbChirpToResponse(chirp))
+}
+
 func filterBadWords(sentence string) string {
 	words := strings.Split(sentence, " ")
 	filtered := make([]string, 0, len(words))
