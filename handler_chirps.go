@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"http-server/internal/auth"
 	"http-server/internal/database"
 
 	"github.com/google/uuid"
@@ -33,14 +34,26 @@ func dbChirpToResponse(chirp database.Chirp) chirpResponse {
 	}
 }
 
-func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, req *http.Request) {
+func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request) {
 	type requestBody struct {
-		Body   string    `json:"body"`
-		UserId uuid.UUID `json:"user_id"`
+		Body string `json:"body"`
 	}
 
-	defer req.Body.Close()
-	data, err := io.ReadAll(req.Body)
+	defer r.Body.Close()
+
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, 401, "invalid bearer")
+		return
+	}
+
+	user, err := auth.ValidateJWT(token, cfg.secret)
+	if err != nil {
+		respondWithError(w, 401, "invalid bearer")
+		return
+	}
+
+	data, err := io.ReadAll(r.Body)
 	if err != nil {
 		respondWithError(w, 500, "could not read the body")
 		return
@@ -58,8 +71,8 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	chirp, err := cfg.db.CreateChirp(req.Context(), database.CreateChirpParams{
-		UserID: params.UserId,
+	chirp, err := cfg.db.CreateChirp(r.Context(), database.CreateChirpParams{
+		UserID: user,
 		Body:   filterBadWords(params.Body),
 	})
 	if err != nil {

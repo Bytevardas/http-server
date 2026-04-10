@@ -36,6 +36,8 @@ func main() {
 	mux.HandleFunc("GET /api/chirps/{chirpId}", config.handlerGetChirp)
 	mux.HandleFunc("POST /api/users", config.handlerCreateUser)
 	mux.HandleFunc("POST /api/login", config.handlerLogin)
+	mux.HandleFunc("POST /api/refresh", config.handlerRefreshToken)
+	mux.HandleFunc("POST /api/revoke", config.handlerRevokeToken)
 
 	server := http.Server{Addr: ":8080", Handler: mux}
 	err = server.ListenAndServe()
