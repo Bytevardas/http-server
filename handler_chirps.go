@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
 	"slices"
 	"sort"
@@ -14,6 +13,8 @@ import (
 
 	"github.com/google/uuid"
 )
+
+const maxChirpLength = 140
 
 var badWords = []string{"kerfuffle", "sharbert", "fornax"}
 
@@ -62,21 +63,14 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	data, err := io.ReadAll(r.Body)
-	if err != nil {
-		respondWithError(w, 500, "could not read the body")
+	var params requestBody
+	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+		respondWithError(w, 400, "invalid request body")
 		return
 	}
 
-	params := requestBody{}
-	err = json.Unmarshal(data, &params)
-	if err != nil {
-		respondWithError(w, 500, "could not unmarshal the body")
-		return
-	}
-
-	if len(params.Body) > 140 {
-		respondWithError(w, 400, "chirp is longer the 140 chars")
+	if len(params.Body) > maxChirpLength {
+		respondWithError(w, 400, "chirp exceeds maximum length of 140 characters")
 		return
 	}
 
@@ -121,14 +115,13 @@ func (cfg *apiConfig) handlerGetAllChirps(w http.ResponseWriter, r *http.Request
 }
 
 func (cfg *apiConfig) handlerGetChirp(w http.ResponseWriter, r *http.Request) {
-	value := r.PathValue("chirpId")
-	chirpId, err := uuid.Parse(value)
+	chirpID, err := uuid.Parse(r.PathValue("chirpId"))
 	if err != nil {
-		respondWithError(w, 400, "value is not uuid")
+		respondWithError(w, 400, "invalid chirp id")
 		return
 	}
 
-	chirp, err := cfg.db.GetChirp(r.Context(), chirpId)
+	chirp, err := cfg.db.GetChirp(r.Context(), chirpID)
 	if err != nil {
 		respondWithError(w, 404, "chirp not found")
 		return

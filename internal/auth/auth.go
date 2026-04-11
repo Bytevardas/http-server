@@ -29,14 +29,14 @@ func CheckPassword(password, hash string) (bool, error) {
 	return match, nil
 }
 
-func MakeJWT(userId uuid.UUID, tokenSecret string, expiresIn time.Duration) (string, error) {
+func MakeJWT(userID uuid.UUID, tokenSecret string, expiresIn time.Duration) (string, error) {
 	token := jwt.NewWithClaims(
 		jwt.SigningMethodHS256,
 		jwt.RegisteredClaims{
 			Issuer:    "chirpy-access",
 			IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
 			ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(expiresIn)),
-			Subject:   userId.String(),
+			Subject:   userID.String(),
 		})
 
 	signedToken, err := token.SignedString([]byte(tokenSecret))

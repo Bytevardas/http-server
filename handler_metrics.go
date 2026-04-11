@@ -5,19 +5,19 @@ import (
 	"net/http"
 )
 
-func (cfg *apiConfig) handlerMetrics(w http.ResponseWriter, req *http.Request) {
+func (cfg *apiConfig) handlerMetrics(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(fmt.Sprintf("<html><body><h1>Welcome, Chirpy Admin</h1><p>Chirpy has been visited %d times!</p></body></html>", cfg.fileserverHits.Load())))
 }
 
-func (cfg *apiConfig) handlerReset(w http.ResponseWriter, req *http.Request) {
+func (cfg *apiConfig) handlerReset(w http.ResponseWriter, r *http.Request) {
 	if cfg.env != "dev" {
 		respondWithError(w, 403, "can't reset the database on non dev environment")
 		return
 	}
 
-	if err := cfg.db.DeleteAllUsers(req.Context()); err != nil {
+	if err := cfg.db.DeleteAllUsers(r.Context()); err != nil {
 		respondWithError(w, 500, "failed to delete users")
 		return
 	}

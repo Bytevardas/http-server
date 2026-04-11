@@ -24,6 +24,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("could not connect to database: %v", err)
 	}
+	if err := db.Ping(); err != nil {
+		log.Fatalf("could not reach database: %v", err)
+	}
 
 	dbQueries := database.New(db)
 	config := apiConfig{db: dbQueries, polkaKey: polkaKey, env: env, secret: secret}
