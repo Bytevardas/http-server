@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -92,6 +93,8 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 }
 
 func (cfg *apiConfig) handlerGetAllChirps(w http.ResponseWriter, r *http.Request) {
+	sortDesc := r.URL.Query().Get("sort") == "desc"
+
 	if authorID := r.URL.Query().Get("author_id"); authorID != "" {
 		parsedID, err := uuid.Parse(authorID)
 		if err != nil {
@@ -103,6 +106,7 @@ func (cfg *apiConfig) handlerGetAllChirps(w http.ResponseWriter, r *http.Request
 			respondWithError(w, 500, "failed to fetch chirps")
 			return
 		}
+		sortChirps(chirps, sortDesc)
 		respondWithJSON(w, 200, toChirpResponses(chirps))
 		return
 	}
@@ -112,6 +116,7 @@ func (cfg *apiConfig) handlerGetAllChirps(w http.ResponseWriter, r *http.Request
 		respondWithError(w, 500, "failed to fetch chirps")
 		return
 	}
+	sortChirps(chirps, sortDesc)
 	respondWithJSON(w, 200, toChirpResponses(chirps))
 }
 
@@ -130,6 +135,15 @@ func (cfg *apiConfig) handlerGetChirp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondWithJSON(w, 200, dbChirpToResponse(chirp))
+}
+
+func sortChirps(chirps []database.Chirp, desc bool) {
+	sort.Slice(chirps, func(i, j int) bool {
+		if desc {
+			return chirps[i].CreatedAt.After(chirps[j].CreatedAt)
+		}
+		return chirps[i].CreatedAt.Before(chirps[j].CreatedAt)
+	})
 }
 
 func filterBadWords(sentence string) string {
