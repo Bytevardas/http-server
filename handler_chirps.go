@@ -34,6 +34,14 @@ func dbChirpToResponse(chirp database.Chirp) chirpResponse {
 	}
 }
 
+func toChirpResponses(chirps []database.Chirp) []chirpResponse {
+	response := make([]chirpResponse, 0, len(chirps))
+	for _, chirp := range chirps {
+		response = append(response, dbChirpToResponse(chirp))
+	}
+	return response
+}
+
 func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request) {
 	type requestBody struct {
 		Body string `json:"body"`
@@ -84,18 +92,27 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 }
 
 func (cfg *apiConfig) handlerGetAllChirps(w http.ResponseWriter, r *http.Request) {
+	if authorID := r.URL.Query().Get("author_id"); authorID != "" {
+		parsedID, err := uuid.Parse(authorID)
+		if err != nil {
+			respondWithError(w, 400, "invalid author_id")
+			return
+		}
+		chirps, err := cfg.db.GetChirpsByAuthor(r.Context(), parsedID)
+		if err != nil {
+			respondWithError(w, 500, "failed to fetch chirps")
+			return
+		}
+		respondWithJSON(w, 200, toChirpResponses(chirps))
+		return
+	}
+
 	chirps, err := cfg.db.GetAllChirps(r.Context())
 	if err != nil {
 		respondWithError(w, 500, "failed to fetch chirps")
 		return
 	}
-
-	response := make([]chirpResponse, 0, len(chirps))
-	for _, chirp := range chirps {
-		response = append(response, dbChirpToResponse(chirp))
-	}
-
-	respondWithJSON(w, 200, response)
+	respondWithJSON(w, 200, toChirpResponses(chirps))
 }
 
 func (cfg *apiConfig) handlerGetChirp(w http.ResponseWriter, r *http.Request) {
