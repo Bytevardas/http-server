@@ -127,3 +127,41 @@ func filterBadWords(sentence string) string {
 	}
 	return strings.Join(filtered, " ")
 }
+
+func (cfg *apiConfig) handlerDeleteChirp(w http.ResponseWriter, r *http.Request) {
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, 401, "invalid token")
+		return
+	}
+
+	userID, err := auth.ValidateJWT(token, cfg.secret)
+	if err != nil {
+		respondWithError(w, 401, "invalid token")
+		return
+	}
+
+	chirpID, err := uuid.Parse(r.PathValue("chirpId"))
+	if err != nil {
+		respondWithError(w, 400, "invalid chirp id")
+		return
+	}
+
+	chirp, err := cfg.db.GetChirp(r.Context(), chirpID)
+	if err != nil {
+		respondWithError(w, 404, "chirp not found")
+		return
+	}
+
+	if chirp.UserID != userID {
+		respondWithError(w, 403, "forbidden")
+		return
+	}
+
+	if err = cfg.db.DeleteChirp(r.Context(), database.DeleteChirpParams{ID: chirpID, UserID: userID}); err != nil {
+		respondWithError(w, 500, "failed to delete chirp")
+		return
+	}
+
+	w.WriteHeader(204)
+}

@@ -21,6 +21,7 @@ type userResponse struct {
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 	Email        string    `json:"email,omitempty"`
+	IsChirpyRed  bool      `json:"is_chirpy_red"`
 	Token        string    `json:"token,omitempty"`
 	RefreshToken string    `json:"refresh_token,omitempty"`
 }
@@ -36,6 +37,7 @@ func dbUserToResponse(user database.User, token string, refreshToken string) use
 		CreatedAt:    user.CreatedAt,
 		UpdatedAt:    user.UpdatedAt,
 		Email:        user.Email,
+		IsChirpyRed:  user.IsChirpyRed,
 		Token:        token,
 		RefreshToken: refreshToken,
 	}
@@ -97,7 +99,7 @@ func (cfg *apiConfig) handlerUpdateUser(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	respondWithJSON(w, 200, userResponse{Email: user.Email})
+	respondWithJSON(w, 200, dbUserToResponse(user, "", ""))
 }
 
 func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
@@ -193,6 +195,57 @@ func (cfg *apiConfig) handlerRevokeToken(w http.ResponseWriter, r *http.Request)
 	}
 	if rowsAffected == 0 {
 		respondWithError(w, 404, "token not found")
+		return
+	}
+
+	w.WriteHeader(204)
+}
+
+type webhookRequest struct {
+	Event string `json:"event"`
+	Data  struct {
+		UserID uuid.UUID `json:"user_id"`
+	} `json:"data"`
+}
+
+func (cfg *apiConfig) handlerUserUpgraded(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
+	key, err := auth.GetApiKey(r.Header)
+	if err != nil {
+		respondWithError(w, 401, "unauthorized")
+		return
+	}
+
+	if key != cfg.polkaKey {
+		respondWithError(w, 401, "unauthorized")
+		return
+	}
+
+	var body webhookRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		respondWithError(w, 400, "bad request")
+		return
+	}
+
+	if body.Event != "user.upgraded" {
+		w.WriteHeader(204)
+		return
+	}
+
+	result, err := cfg.db.UpgradeUserToChirpyRed(r.Context(), body.Data.UserID)
+	if err != nil {
+		respondWithError(w, 500, "failed to upgrade user")
+		return
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		respondWithError(w, 500, "failed to upgrade user")
+		return
+	}
+	if rowsAffected == 0 {
+		respondWithError(w, 404, "user not found")
 		return
 	}
 
