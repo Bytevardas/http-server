@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
 	"time"
 
@@ -45,15 +44,9 @@ func dbUserToResponse(user database.User, token string, refreshToken string) use
 func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
-	data, err := io.ReadAll(r.Body)
-	if err != nil {
-		respondWithError(w, 500, "failed to read the body")
-		return
-	}
-
 	var params requestBody
-	if err = json.Unmarshal(data, &params); err != nil {
-		respondWithError(w, 500, "failed to unmarshal data")
+	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+		respondWithError(w, 400, "failed to read the body")
 		return
 	}
 
@@ -72,18 +65,47 @@ func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) 
 	respondWithJSON(w, 201, dbUserToResponse(user, "", ""))
 }
 
-func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
-
-	data, err := io.ReadAll(r.Body)
+func (cfg *apiConfig) handlerUpdateUser(w http.ResponseWriter, r *http.Request) {
+	token, err := auth.GetBearerToken(r.Header)
 	if err != nil {
+		respondWithError(w, 401, "invalid token")
+		return
+	}
+
+	userID, err := auth.ValidateJWT(token, cfg.secret)
+	if err != nil {
+		respondWithError(w, 401, "invalid token")
+		return
+	}
+
+	defer r.Body.Close()
+	var params requestBody
+	if err = json.NewDecoder(r.Body).Decode(&params); err != nil {
 		respondWithError(w, 500, "failed to read the body")
 		return
 	}
 
+	hash, err := auth.HashPassword(params.Password)
+	if err != nil {
+		respondWithError(w, 500, "failed to hash password")
+		return
+	}
+
+	user, err := cfg.db.UpdateUserDetails(r.Context(), database.UpdateUserDetailsParams{Email: params.Email, HashedPassword: hash, ID: userID})
+	if err != nil {
+		respondWithError(w, 500, "failed to update")
+		return
+	}
+
+	respondWithJSON(w, 200, userResponse{Email: user.Email})
+}
+
+func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
 	var params requestBody
-	if err = json.Unmarshal(data, &params); err != nil {
-		respondWithError(w, 500, "failed to unmarshal params")
+	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+		respondWithError(w, 400, "failed to read the body")
 		return
 	}
 
